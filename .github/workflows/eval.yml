@@ -1,0 +1,31 @@
+name: tests-and-eval
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest -q
+      - name: Run CUAD eval (deterministic — no keys needed in CI)
+        run: python -m auditagent.eval --json eval_report.json --md eval_report.md
+      - name: Upload eval report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuad-eval-report
+          path: |
+            eval_report.json
+            eval_report.md
+      # The F1 badge in the README is generated from eval_report.json.
+      # With DEEPSEEK_API_KEY in repo secrets, swap the eval step to use the
+      # real model for published B1/B2 numbers.

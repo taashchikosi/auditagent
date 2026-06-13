@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Env / secrets (keys are server-side only — never commit)
+.env
+.env.*
+PASTE_KEY_HERE.txt
+
+# Full CUAD corpus (downloaded on demand to repo-root /data; sample ships in
+# src/auditagent/data/cuad/ and IS committed under CC BY 4.0).
+/data/cuad/
+**/_cuad_repo/
+**/_extracted/
+*.zip
+
+# OS
+.DS_Store

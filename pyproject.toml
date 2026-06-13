@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "auditagent"
+version = "0.1.0"
+description = "Autonomous contract-review & risk-flagging agent — citation-anchored, eval-measured. Milestone 1: offset-exact parsing + FastMCP tool layer."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Taashira Chikosi", email = "taashira.chikosi@gmail.com" }]
+dependencies = [
+    "pydantic>=2.6",
+    "fastmcp>=2.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+pdf = ["pdfplumber>=0.11"]
+docx = ["python-docx>=1.1"]
+dev = ["pytest>=8.0", "ruff>=0.4", "httpx>=0.27"]
+
+[project.scripts]
+auditagent-mcp = "auditagent.mcp_server:mcp.run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/auditagent"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

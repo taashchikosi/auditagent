@@ -1,0 +1,61 @@
+MASTER SOFTWARE AND SERVICES AGREEMENT
+
+This Master Software and Services Agreement (the "Agreement") is entered into as of March 14, 2024 (the "Effective Date") by and between Meridian Analytics, Inc., a Delaware corporation with offices at 500 Howard Street, San Francisco, California ("Provider"), and Brightwater Logistics LLC, a Texas limited liability company ("Customer"). Provider and Customer are each a "Party" and together the "Parties."
+
+1. DEFINITIONS
+
+1.1 "Services" means the software-as-a-service platform, professional services, and support described in one or more Order Forms executed by the Parties.
+
+1.2 "Order Form" means an ordering document referencing this Agreement and specifying the Services, fees, and subscription term.
+
+2. TERM AND RENEWAL
+
+2.1 Initial Term. This Agreement commences on the Effective Date and continues for an initial period of twelve (12) months, unless terminated earlier in accordance with Section 9.
+
+2.2 Automatic Renewal. Upon expiration of the Initial Term, this Agreement shall automatically renew for successive twelve (12) month periods unless either Party provides written notice of non-renewal at least ninety (90) days prior to the end of the then-current term. Customer acknowledges that failure to deliver such notice within the required window shall result in a binding renewal and the associated fees.
+
+3. FEES AND PAYMENT
+
+3.1 Fees. Customer shall pay the fees set forth in each Order Form within thirty (30) days of the invoice date. Late amounts accrue interest at 1.5% per month.
+
+4. NON-COMPETITION
+
+4.1 Restriction. During the Term and for a period of two (2) years following termination, Customer shall not, directly or indirectly, develop, market, or assist any third party in developing a product that competes with the Provider platform within North America. Customer further agrees not to solicit or employ any Provider personnel involved in the delivery of the Services during the same period.
+
+5. INTELLECTUAL PROPERTY
+
+5.1 Ownership. Provider retains all right, title, and interest in and to the Services and all underlying technology. Customer receives a non-exclusive, non-transferable license to use the Services solely for its internal business operations.
+
+6. CONFIDENTIALITY
+
+6.1 Each Party shall protect the other Party's Confidential Information using no less than reasonable care and shall not disclose it to any third party except as permitted herein.
+
+7. LIMITATION OF LIABILITY
+
+7.1 Notwithstanding anything to the contrary in this Agreement, the Parties agree that neither Party's aggregate liability shall be limited with respect to claims arising from gross negligence, willful misconduct, breach of confidentiality, or indemnification obligations, and for such claims each Party's liability shall be unlimited. For all other claims, each Party's aggregate liability shall not exceed the fees paid in the twelve (12) months preceding the claim.
+
+8. CHANGE OF CONTROL
+
+8.1 Assignment on Change of Control. Neither Party may assign this Agreement without the prior written consent of the other Party, except that in the event of a merger, acquisition, or sale of all or substantially all of a Party's assets, this Agreement shall automatically transfer to the successor entity, provided that the assigning Party gives the other Party written notice within thirty (30) days of the transaction. Provider reserves the right to terminate this Agreement upon a Change of Control of Customer by a direct competitor of Provider.
+
+9. TERMINATION
+
+9.1 Termination for Cause. Either Party may terminate this Agreement upon thirty (30) days' written notice if the other Party materially breaches the Agreement and fails to cure such breach within the notice period.
+
+9.2 Termination for Convenience. Provider may terminate this Agreement or any Order Form at any time, for any reason or no reason, upon sixty (60) days' prior written notice to Customer, without liability or penalty. Customer shall remain responsible for fees accrued through the effective date of termination.
+
+10. GOVERNING LAW
+
+10.1 This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict-of-laws principles.
+
+11. ENTIRE AGREEMENT
+
+11.1 This Agreement, together with all Order Forms, constitutes the entire agreement between the Parties and supersedes all prior or contemporaneous understandings.
+
+IN WITNESS WHEREOF, the Parties have executed this Agreement as of the Effective Date.
+
+MERIDIAN ANALYTICS, INC.                 BRIGHTWATER LOGISTICS LLC
+
+By: ____________________                 By: ____________________
+Name: Dana Reyes                         Name: Samuel Okoro
+Title: Chief Executive Officer           Title: Managing Member
