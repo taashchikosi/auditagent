@@ -11,9 +11,11 @@ service alongside RetrofitGPT.
 
 from __future__ import annotations
 
+import os
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import __version__
@@ -28,6 +30,22 @@ from .pipeline import compare, run_review
 from .security import rate_limit, require_token
 
 app = FastAPI(title="AuditAgent", version=__version__)
+
+# The unified portfolio site (Vercel) calls this backend from the browser, so the
+# response needs CORS headers or the browser blocks the demo. Origins are env-driven:
+# set AUDITAGENT_ALLOWED_ORIGINS to a comma-separated list of https origins in prod
+# (e.g. the Vercel domain); defaults to "*" for the zero-config local/demo case.
+# These are read-only demo routes with no cookies, so a wildcard is acceptable here.
+_origins_env = os.getenv("AUDITAGENT_ALLOWED_ORIGINS", "*").strip()
+_allowed_origins = (
+    ["*"] if _origins_env == "*" else [o.strip() for o in _origins_env.split(",") if o.strip()]
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 # Dependencies applied to every LLM-calling (i.e. cost-incurring) route:
 # throttle first, then require the bearer token when one is configured.
