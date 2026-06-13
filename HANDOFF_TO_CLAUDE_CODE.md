@@ -9,7 +9,7 @@ _Last updated: 13 June 2026. Prior context: `HANDOFF_AuditAgent_GateFix_COMPLETE
 
 AuditAgent (citation-anchored CUAD contract-review agent) is **M1–M3 complete with a real, reproducible n=102 benchmark**. A deployment-readiness audit (13 Jun) cleared the three red blockers — **it is now demo-deployable**. What remains is **M4: get it live on the shared host with durable state.** All work is local; **73 tests pass**. Your job is M4, in the priority order in §5.
 
-**FIRST ACTION:** finalize the uncommitted commit (see §3) — the previous session built the blocker fixes but a filesystem-mount quirk left them uncommitted.
+**FIRST ACTION:** all work is committed locally (latest `99290aa` on branch **`master`**) but **not yet pushed**, and the branch name **mismatches CI**. See §3 — it's a 2-command fix, and until it's pushed to the remote Taash created, the code exists nowhere but her disk and CI has never run.
 
 ---
 
@@ -28,7 +28,7 @@ An autonomous contract-review agent: a 4-agent **LangGraph** pipeline (Extractor
 | M3 CUAD eval harness, baseline ladder B0/B1/B2, per-clause F1 | ✅ |
 | **Real n=102 DeepSeek benchmark, reproducible at temp 0** | ✅ committed `eval_deepseek_full.{json,md}` |
 | `uncapped_liability` precision fix (0.20→0.39, recall held) | ✅ `clauses.py` definitions + `test_clause_definitions.py` |
-| Git repo initialised | ✅ first commit `f898ad2` |
+| Git repo initialised + hardening committed | ✅ `f898ad2` (init) → `99290aa` (hardening), branch `master`, **not pushed yet** |
 | **Rate-limit + bearer-token gate** on paid routes | ✅ `security.py` + 7 tests |
 | **Pinned deps** (`requirements.lock`) + reproducible Dockerfile | ✅ |
 | README refreshed with real numbers | ✅ |
@@ -39,21 +39,31 @@ An autonomous contract-review agent: a 4-agent **LangGraph** pipeline (Extractor
 
 ---
 
-## 3. ⚠️ FIRST: finalize the uncommitted commit
+## 3. ⚠️ FIRST: push to the remote + fix the branch/CI mismatch
 
-The blocker fixes are written to disk but **uncommitted** (the previous session ran in a sandbox whose mount couldn't delete `.git/index.lock`). On this machine you have full permissions:
+Everything is **committed locally** (`f898ad2` init → `99290aa` hardening, 73 tests pass) but **not pushed**, and the local branch is **`master`** while the CI workflow triggers on **`main`** (`.github/workflows/eval.yml` → `on: push: branches: [main]`). Pushing `master` as-is will NOT run the push-CI. Rename to `main` (standard, matches CI), wire the remote Taash created, and push:
 
 ```
 cd ~/Documents/Claude/Projects/Agentic\ AI\ Portfolio/auditagent
-rm -f .git/index.lock .git/HEAD.lock
-PYTHONPATH=src python3.14 -m pytest -q
-git add -A
-git commit -m "Deployment hardening: rate-limit + token gate, pinned deps, README refresh"
+git branch -M main
 git remote -v
+```
+
+If no remote is listed, add the one Taash created (replace the URL):
+
+```
+git remote add origin https://github.com/<her-user>/<her-repo>.git
+```
+
+Then push and confirm CI:
+
+```
 git push -u origin main
 ```
 
-**Acceptance:** `pytest` shows **73 passed**; `git status` clean; `git push` succeeds to the repo Taash created; the CI workflow (`.github/workflows/eval.yml`) runs and goes green on GitHub. This is the moment CI runs for the first time ever — watch it.
+**Acceptance:** `git push` succeeds; the branch on GitHub is `main`; the CI workflow (`.github/workflows/eval.yml`) runs on the push and goes **green** (it runs `pytest` + the deterministic CUAD eval — no key needed). This is the first CI run ever — watch it. If CI should also publish real-model numbers, add `DEEPSEEK_API_KEY` to the repo secrets and have the eval step use it (the workflow has a comment showing where).
+
+> Alternative if Taash prefers to keep `master`: change the workflow's `branches: [main]` to `[master]` instead of renaming. Renaming to `main` is the recommended path.
 
 ---
 
@@ -73,8 +83,8 @@ git push -u origin main
 
 ## 5. M4 — remaining work, in priority order
 
-### 5.1 🔴 Push + green CI (≈15 min) — do this first (it's §3)
-Acceptance: remote has the code, CI passes. Consider adding `ruff check` as a CI step (see §7 for the 5 known cosmetic lints to fix first, or add `--exit-zero`).
+### 5.1 🔴 Push + green CI (≈10 min) — do this first (it's §3)
+Acceptance: remote has the code on `main`, CI passes. ruff is already clean, so adding `ruff check src tests` as a CI step is now a safe, free quality gate — recommended.
 
 ### 5.2 🔴 Deploy the container to the shared VPS (port 8002)
 - Build from the pinned Dockerfile; run beside RetrofitGPT (8001).
