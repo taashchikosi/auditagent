@@ -4,7 +4,7 @@
 
 > In 2025, Deloitte Australia partially refunded the federal government after an AI-assisted report contained fabricated citations. AuditAgent is built to make that failure impossible: **every finding must quote the exact contract text it came from, or it is rejected.**
 
-`Status: 🟢 Milestone 3 of 4 — CUAD eval harness + baseline ladder live. (M1: parsing · M2: pipeline + citation gate.)`
+`Status: 🟢 Milestone 3 of 4 complete + real-model benchmark in. M4 (deploy) in progress. (M1: parsing · M2: pipeline + citation gate · M3: CUAD eval, n=102 reproducible.)`
 
 ---
 
@@ -53,22 +53,26 @@ raw_text[span.start_char : span.end_char] == span.text     # always, exactly
 ## Accuracy harness (Milestone 3) — measured against real CUAD labels
 
 `make eval` scores detection against the **real CUAD held-out test split** (a
-20-contract sample ships in the repo; the full 510 download via
+20-contract sample ships in the repo; the **full 102-contract test split** via
 `make eval-full`). The scorer (`eval/scorer.py`) computes per-clause
 precision/recall/F1, Precision@Recall, plus the metrics that matter for
 contract review: **laziness rate** (present clauses wrongly called absent),
 **citation faithfulness** (right answer *and* right evidence), and **high-risk
 recall**. The baseline ladder is **B0** (published RoBERTa P@80%R ≈ 0.482) →
-**B1** single-shot → **B2** agent; the headline is the **B2 − B1 delta on
-high-risk recall**.
+**B1** single-shot → **B2** agent.
 
-> ⚠️ **Honest status:** the numbers committed in `eval_report.md` are from the
-> **deterministic stand-in detector** (no model API reachable in this build
-> environment), so they validate the *measurement machinery* against real
-> labels — they are **not** a publishable benchmark result. The real DeepSeek
-> B1/B2 numbers come from `make eval` on a host where the DeepSeek API is
-> reachable (`DEEPSEEK_API_KEY` set). The harness reports **measured**
-> cost+latency per contract from the API's token usage — never guessed.
+### Real-model result — DeepSeek V4 Flash, full CUAD test split (n=102, temperature 0, 2× reproducibility-checked)
+
+| Metric | Value |
+|---|---|
+| B2 macro-F1 | **0.649** |
+| B2 high-risk recall | **0.912** |
+| Citation faithfulness — naive exact-anchor → **fuzzy-but-verified anchorer** | 0.555 → **0.849** (**+0.29**) |
+| Cost / latency per contract | **$0.0035 · 3.4 s** (measured from token usage) |
+
+**The headline is the citation anchorer** (+0.29 faithfulness, replicated on Claude at +0.33), not "agent beats single-shot." The gate is a **precision / integrity mechanism**: every accepted finding is a verified exact quote; an unanchorable (likely hallucinated) one cannot pass. See [`CASE_STUDY_n102_wobble.md`](CASE_STUDY_n102_wobble.md) for the full measure → scale → root-cause → fix arc (incl. the `uncapped_liability` precision fix, **0.20 → 0.39 with no recall loss**).
+
+> ✅ **Reproducible at temperature 0.** The committed `eval_deepseek_full.{json,md}` is the canonical run; `eval_report.{json,md}` is the offline deterministic floor that validates the measurement machinery in CI without a key. Cost+latency are **measured** from the API's token usage — never guessed.
 
 ### The catch (run `make demo-m2`)
 
@@ -99,8 +103,9 @@ make mcp            # run the FastMCP contract-tools server
 For the real model numbers (where DeepSeek is reachable):
 
 ```bash
-export DEEPSEEK_API_KEY=sk-...   # rotate any key shared in plaintext
-make eval-full                   # download full CUAD test split, run real B1/B2
+export DEEPSEEK_API_KEY=sk-...
+python scripts/download_cuad.py --extract        # writes the 102-contract test split
+bash scripts/benchmark_twice.sh data/cuad/CUADv1_test.json   # real B1/B2, 2x reproducibility
 ```
 
 ---
@@ -121,8 +126,8 @@ Five clauses with a real F1 table beats 41 half-working. Expanding to 41 is v1.1
 |---|---|
 | **M1 ✅** | FastMCP runs; contract parses to offset-exact spans; `/health` up; contract pre-loaded |
 | **M2 ✅** | 4-agent LangGraph pipeline; **citation gate** rejects uncited findings; HITL approve gate; injection resistance; B1-vs-agent side-by-side |
-| **M3 ✅ (here)** | CUAD scorer + baseline ladder B0/B1/B2 + per-clause F1 + laziness/faithfulness + measured cost/latency, in CI. *(Real-model numbers pending a DeepSeek-reachable run.)* |
-| **M4** | Live on the shared host as a route in the unified portfolio site; amazing-on-open README + demo |
+| **M3 ✅** | CUAD scorer + baseline ladder B0/B1/B2 + per-clause F1 + laziness/faithfulness + measured cost/latency, in CI. **Real DeepSeek numbers in at n=102, reproducible at temp 0.** |
+| **M4 🔨 (in progress)** | Live on the shared host as a route in the unified portfolio site. **Done:** Docker + pinned deps, `/health`, bearer-token + rate-limit on paid routes. **Remaining:** push to remote + CI run, Postgres-backed sessions/audit log, Langfuse traces. |
 
 ---
 
@@ -133,7 +138,17 @@ Python · LangGraph · **FastMCP** · **Pydantic v2** · FastAPI (SSE) · Postgr
 
 ## Deployment
 
-Backend containerises onto the **shared always-on VPS** (port 8002, beside RetrofitGPT); the UI is a route in the unified portfolio site. `/health` drives the live-status dot. No cold start.
+Backend containerises onto the **shared always-on VPS** (port 8002, beside RetrofitGPT); the UI is a route in the unified portfolio site. `/health` drives the live-status dot. No cold start. Builds are reproducible — `requirements.lock` pins the full transitive set; the Dockerfile installs the lock then the package `--no-deps`.
+
+**Edge protection on the paid (LLM-calling) routes** — `/review`, `/review/sample`, `/compare/*`:
+
+```bash
+export AUDITAGENT_API_TOKEN=...        # if set, these routes require Authorization: Bearer <token>; /health stays open
+export AUDITAGENT_RATE_LIMIT=20        # requests per window per client (default 20)
+export AUDITAGENT_RATE_WINDOW_SEC=60   # window length in seconds (default 60)
+```
+
+The token gate fails **open** when no token is configured (zero-config local demo) and enforces the moment the env var is present. Rate-limit state is in-process — correct for the single always-on container; a multi-replica deploy moves the window to Redis behind the same dependency interface.
 
 ## References
 

@@ -80,7 +80,7 @@ def _call_claude(
         try:
             resp = httpx.post(_ENDPOINT, headers=headers, json=payload_json,
                               timeout=120, verify=verify)
-        except httpx.TransportError as exc:
+        except httpx.TransportError:
             # Connection-level failures (TLS handshake timeout, connect/read
             # timeout, connection reset) are raised BEFORE any HTTP status, so
             # the status-code retry below never sees them. Without this, one

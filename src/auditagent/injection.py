@@ -18,7 +18,7 @@ import re
 _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"ignore (all |any |the |prior |previous )?(instructions|prompts?)", re.I),
     re.compile(r"disregard (the |all |any )?(above|previous|prior|system)", re.I),
-    re.compile(r"mark (this|the) (contract|agreement|document)? ?as (low[- ]?risk|safe|approved)", re.I),
+    re.compile(r"mark (this|the) (contract|agreement|document)? ?as (low[- ]?risk|safe|approved)", re.I),  # noqa: E501
     re.compile(r"you are now", re.I),
     re.compile(r"new (system )?(instructions?|prompt)", re.I),
     re.compile(r"do not (flag|report|mention)", re.I),

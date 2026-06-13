@@ -8,7 +8,7 @@ faithfulness). The scorer is provider-agnostic: deterministic offline, or real
 DeepSeek/Claude when keys are set.
 """
 
-from .cuad import EvalContract, load_cuad_sample, load_cuad_file
+from .cuad import EvalContract, load_cuad_file, load_cuad_sample
 from .scorer import ClauseScore, score_predictions
 
 __all__ = [

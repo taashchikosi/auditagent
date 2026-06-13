@@ -4,9 +4,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Reproducible builds: install the fully-pinned transitive set FIRST (cached
+# layer, unchanged between code edits), then the package itself with --no-deps
+# so pip never re-resolves to a newer-and-untested version at build time.
+COPY requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
+
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 EXPOSE 8002
 # Container-level health check feeds the platform's 🟢/🔴 status dot.

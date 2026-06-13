@@ -217,9 +217,9 @@ def render_markdown(report: dict) -> str:
         "",
         "## Baseline ladder",
         "",
-        "| Baseline | macro-F1 | high-risk recall | laziness | citation faith. | $/contract | s/contract |",
+        "| Baseline | macro-F1 | high-risk recall | laziness | citation faith. | $/contract | s/contract |",  # noqa: E501
         "|---|---|---|---|---|---|---|",
-        f"| **B0** {report['B0']['name']} | — | — (P@80R={report['B0']['p_at_80r']}) | — | — | — | — |",
+        f"| **B0** {report['B0']['name']} | — | — (P@80R={report['B0']['p_at_80r']}) | — | — | — | — |",  # noqa: E501
         f"| **B1** single-shot | {b1['macro_f1']} | {b1['high_risk_recall']} | "
         f"{b1['mean_laziness_rate']} | {b1['mean_citation_faithfulness']} | "
         f"{b1['cost_usd_per_contract']} | {b1['sec_per_contract']} |",
@@ -257,7 +257,7 @@ def render_markdown(report: dict) -> str:
         "moves is whether each citation lands on the RIGHT text, and whether an "
         "unverifiable finding can reach output. This is the real product story._",
         "",
-        "| Pipeline | high-risk recall | citation faithfulness | every accepted finding a verifiable slice? |",
+        "| Pipeline | high-risk recall | citation faithfulness | every accepted finding a verifiable slice? |",  # noqa: E501
         "|---|---|---|---|",
         f"| B1 naive single-shot (exact-anchor) | {report['B1_naive']['high_risk_recall']} | "
         f"{report['B1_naive']['mean_citation_faithfulness']} | no |",
@@ -269,7 +269,7 @@ def render_markdown(report: dict) -> str:
         f"- **Anchorer lift:** naive → fair citation faithfulness "
         f"{report['B1_naive']['mean_citation_faithfulness']} → "
         f"{b1['mean_citation_faithfulness']} (same detections, better-placed citations).",
-        f"- **Gate guarantee:** 100% of B2's accepted findings re-slice the raw "
+        "- **Gate guarantee:** 100% of B2's accepted findings re-slice the raw "
         "contract exactly; an unanchorable (likely hallucinated) finding cannot pass.",
         f"- **Honest limit:** {report['B2_wrong_location_findings']} accepted "
         "finding(s) verify as a real slice but miss the gold clause region "

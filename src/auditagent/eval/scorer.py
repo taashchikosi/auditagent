@@ -20,6 +20,7 @@ from ..clauses import CLAUSES_BY_KEY
 from ..models import RiskLevel
 from .cuad import EvalContract, GoldSpan
 
+
 # A single prediction for one (contract, clause).
 @dataclass
 class PredItem:
@@ -78,7 +79,7 @@ def _pr_sweep(instances: list[tuple[float, bool]]) -> dict[str, float]:
     ranked = sorted(instances, key=lambda x: x[0], reverse=True)
     tp = fp = 0
     points: list[tuple[float, float]] = []  # (recall, precision)
-    for score, y in ranked:
+    for _score, y in ranked:
         if y:
             tp += 1
         else:

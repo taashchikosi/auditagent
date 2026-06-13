@@ -19,7 +19,7 @@ demo-m2:        ## M2: full pipeline — the catch, citation gate, injection, au
 eval:           ## M3: run the CUAD baseline ladder (B0/B1/B2) + per-clause F1
 	$(PYTHON) -m auditagent.eval --json eval_report.json --md eval_report.md
 
-eval-full:      ## M3: download full CUAD (510) then eval on the real test split
+eval-full:      ## M3: download CUAD, eval on the full 102-contract held-out test split
 	$(PYTHON) scripts/download_cuad.py --extract
 	$(PYTHON) -m auditagent.eval --full data/cuad/CUADv1_test.json
 

@@ -11,7 +11,9 @@ service alongside RetrofitGPT.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import uuid
+
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from . import __version__
@@ -23,8 +25,13 @@ from .data import (
 )
 from .parser import parse_text
 from .pipeline import compare, run_review
+from .security import rate_limit, require_token
 
 app = FastAPI(title="AuditAgent", version=__version__)
+
+# Dependencies applied to every LLM-calling (i.e. cost-incurring) route:
+# throttle first, then require the bearer token when one is configured.
+_PAID = [Depends(rate_limit), Depends(require_token)]
 
 
 @app.get("/health")
@@ -41,7 +48,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "version": __version__,
-        "milestone": "M1",
+        "milestone": "M3",
         "sample_loaded": True,
         "n_spans": report["n_spans"],
         "citation_anchoring": "ok" if report["all_spans_anchor"] else "FAILING",
@@ -85,7 +92,7 @@ class HITLRequest(BaseModel):
     decision: str = "approved"  # approved | escalated
 
 
-@app.post("/review/sample")
+@app.post("/review/sample", dependencies=_PAID)
 def review_sample(perspective: str = "buyer") -> dict:
     """Run the full agentic pipeline on the pre-loaded contract (zero-config)."""
     raw = load_sample_contract_text()
@@ -93,7 +100,7 @@ def review_sample(perspective: str = "buyer") -> dict:
         raw, doc_id="sample", source_name=SAMPLE_CONTRACT_PATH.name,
         perspective=perspective,
     )
-    sid = f"sample-{id(session)}"
+    sid = f"sample-{uuid.uuid4().hex}"
     _SESSIONS[sid] = session
     return {
         "session_id": sid,
@@ -112,13 +119,13 @@ def review_sample(perspective: str = "buyer") -> dict:
     }
 
 
-@app.post("/review")
+@app.post("/review", dependencies=_PAID)
 def review(req: ReviewRequest) -> dict:
     session = run_review(
         req.raw_text, doc_id=req.doc_id, source_name=req.source_name,
         perspective=req.perspective,
     )
-    sid = f"rev-{id(session)}"
+    sid = f"rev-{uuid.uuid4().hex}"
     _SESSIONS[sid] = session
     return {"session_id": sid, "memo": session.memo.summary(),
             "audit_chain_valid": session.audit.verify_chain()}
@@ -129,20 +136,20 @@ def hitl_decide(req: HITLRequest) -> dict:
     """Resume a paused run with a human Approve/Escalate decision."""
     session = _SESSIONS.get(req.session_id)
     if session is None:
-        return {"error": "unknown session_id"}
+        raise HTTPException(status_code=404, detail="unknown session_id")
     memo = session.decide(req.decision)  # type: ignore[attr-defined]
     return {"session_id": req.session_id, "hitl_status": memo.hitl_status,
             "memo": memo.summary()}
 
 
-@app.get("/compare/sample")
+@app.get("/compare/sample", dependencies=_PAID)
 def compare_sample(perspective: str = "buyer") -> dict:
     """Side-by-side single-shot (B1) vs the agent on the pre-loaded contract."""
     raw = load_sample_contract_text()
     return compare(raw, perspective=perspective)
 
 
-@app.get("/compare/injection")
+@app.get("/compare/injection", dependencies=_PAID)
 def compare_injection(perspective: str = "buyer") -> dict:
     """Run the agent on the adversarial contract; prove the injection is refused."""
     raw = load_injection_contract_text()
