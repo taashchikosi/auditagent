@@ -21,8 +21,11 @@ sessions/audit-log are in-process for the demo (durable Postgres is a later mile
 - VPS reachable over SSH, Docker installed (`docker --version`).
 - Caddy already running for RetrofitGPT (we just add one site block).
 - Ports 80 + 443 open. Port 8002 stays internal.
-- Optional: `DEEPSEEK_API_KEY` for real-model output. Without it the demo runs the
-  deterministic stand-in and still shows the citation gate working.
+- **`DEEPSEEK_API_KEY` — REQUIRED for the public demo.** DeepSeek V4 Flash is the locked
+  production model. The offline deterministic provider is a keyword stand-in for CI/tests
+  only; running it behind a "live agent" demo would present keyword-matching as the AI
+  agent — a standards violation ("measurable, not vibes"; MASTER_HANDOFF §8/§14). Use a
+  FRESH, rotated key — the key pasted in chat in an earlier session is compromised (§8.1).
 
 ---
 
@@ -42,12 +45,13 @@ Build the image from the pinned Dockerfile (fast — no heavy deps):
 docker build -t auditagent:latest .
 ```
 
-Run it on 8002. This keeps the token gate OPEN (no `AUDITAGENT_API_TOKEN`) so the public
-demo's `/review/sample` works without a browser secret; the rate-limit still protects it.
-Leave CORS at its `*` default. With a DeepSeek key, add `-e DEEPSEEK_API_KEY=<your-key>`:
+Run it on 8002 WITH the rotated DeepSeek key, so the live demo runs the real production
+model (not the stand-in). This keeps the token gate OPEN (no `AUDITAGENT_API_TOKEN`) so the
+public demo's `/review/sample` works without a browser secret; the rate-limit still protects
+it. CORS stays at its `*` default:
 
 ```bash
-docker run -d --name auditagent --restart unless-stopped -p 127.0.0.1:8002:8002 auditagent:latest
+docker run -d --name auditagent --restart unless-stopped -p 127.0.0.1:8002:8002 -e DEEPSEEK_API_KEY=<your-rotated-key> auditagent:latest
 ```
 
 Verify it's alive on the box:
