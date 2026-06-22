@@ -14,6 +14,13 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir --no-deps .
 
+# Ship the re-baseline artifact (the single source of truth) so GET /demo/numbers
+# serves the honest figures — without it the endpoint degrades to "not_re_baselined"
+# and the demo's "About the numbers" panel would render empty. The package is
+# pip-installed (site-packages), so point the endpoint at the shipped artifact.
+COPY rebaseline/REBASELINE_SUMMARY.json ./rebaseline/REBASELINE_SUMMARY.json
+ENV AUDITAGENT_REBASELINE_PATH=/app/rebaseline/REBASELINE_SUMMARY.json
+
 EXPOSE 8002
 # Container-level health check feeds the platform's 🟢/🔴 status dot.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

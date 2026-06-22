@@ -20,17 +20,18 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TypedDict
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from .agents import analyze_risk, classify_clauses, extract, review_findings
 from .audit_log import AuditLog
 from .checklist import run_checklist
+from .checkpointer import get_checkpointer
 from .clauses import V1_CLAUSES
 from .injection import injection_summary
 from .llm import get_classifier, get_reviewer
 from .models import Finding, Perspective, ReviewedFinding, RiskMemo
+from .tracing import get_tracer
 
 
 class ReviewState(TypedDict, total=False):
@@ -51,71 +52,104 @@ class RunContext:
     reviewed: list[ReviewedFinding] = field(default_factory=list)
     injection_flags: list[str] = field(default_factory=list)
     memo: RiskMemo | None = None
+    trace_run: object | None = None  # Langfuse run (or a no-op); set in n_extract
 
 
-def build_graph(audit: AuditLog | None = None):
-    """Compile the review graph. Returns (compiled_graph, audit_log, context)."""
+def build_graph(audit: AuditLog | None = None, ctx: RunContext | None = None):
+    """Compile the review graph. Returns (compiled_graph, audit_log, context).
+
+    `ctx` may be supplied to rehydrate a run after a restart: the only field the
+    HITL resume pass reads is `ctx.memo`, so restoring that (from the durable
+    session store) lets a paused review resume in a fresh process.
+    """
     log = audit or AuditLog()
-    ctx = RunContext()
+    ctx = ctx if ctx is not None else RunContext()
     classifier = get_classifier()
     reviewer = get_reviewer()
+    tracer = get_tracer()  # Langfuse if configured, else a zero-cost no-op
 
     def n_extract(state: ReviewState) -> ReviewState:
-        parsed, chunks = extract(
-            state["raw_text"], doc_id=state["doc_id"], source_name=state["source_name"]
-        )
-        log.append("extractor", "parsed",
-                   {"n_spans": parsed.n_spans, "n_chunks": len(chunks)})
+        # The trace spans the whole run; each node is a child span below.
+        ctx.trace_run = tracer.start_run("contract_review")
+        with ctx.trace_run.span("extract") as sp:
+            parsed, chunks = extract(
+                state["raw_text"], doc_id=state["doc_id"], source_name=state["source_name"]
+            )
+            detail = {"n_spans": parsed.n_spans, "n_chunks": len(chunks)}
+            sp.update(metadata=detail)
+            log.append("extractor", "parsed", detail)
         return {}
 
     def n_classify(state: ReviewState) -> ReviewState:
-        ctx.findings = classify_clauses(state["raw_text"], classifier)
-        log.append("classifier", "detected",
-                   {"n_candidates": len(ctx.findings), "provider": classifier.name})
+        with ctx.trace_run.span("classify") as sp:
+            ctx.findings = classify_clauses(state["raw_text"], classifier)
+            detail = {"n_candidates": len(ctx.findings), "provider": classifier.name}
+            sp.update(metadata=detail)
+            log.append("classifier", "detected", detail)
         return {}
 
     def n_risk(state: ReviewState) -> ReviewState:
-        persp = Perspective(state.get("perspective", "neutral"))
-        ctx.findings = analyze_risk(ctx.findings, persp)
-        log.append("risk_analyzer", "scored",
-                   {"n": len(ctx.findings), "perspective": persp.value})
+        with ctx.trace_run.span("risk") as sp:
+            persp = Perspective(state.get("perspective", "neutral"))
+            ctx.findings = analyze_risk(ctx.findings, persp)
+            detail = {"n": len(ctx.findings), "perspective": persp.value}
+            sp.update(metadata=detail)
+            log.append("risk_analyzer", "scored", detail)
         return {}
 
     def n_review(state: ReviewState) -> ReviewState:
-        ctx.reviewed = review_findings(ctx.findings, state["raw_text"], reviewer)
-        ctx.injection_flags = injection_summary(state["raw_text"])
-        for r in ctx.reviewed:
-            log.append("reviewer", "gate_decision",
-                       {"clause": r.finding.clause_type, "status": r.status.value,
-                        "retries": r.retries})
-        if ctx.injection_flags:
-            log.append("reviewer", "injection_refused",
-                       {"n_flags": len(ctx.injection_flags)})
+        with ctx.trace_run.span("review") as sp:
+            ctx.reviewed = review_findings(ctx.findings, state["raw_text"], reviewer)
+            ctx.injection_flags = injection_summary(state["raw_text"])
+            for r in ctx.reviewed:
+                log.append("reviewer", "gate_decision",
+                           {"clause": r.finding.clause_type, "status": r.status.value,
+                            "retries": r.retries})
+            if ctx.injection_flags:
+                log.append("reviewer", "injection_refused",
+                           {"n_flags": len(ctx.injection_flags)})
+            sp.update(metadata={
+                "n_accepted": sum(1 for r in ctx.reviewed if r.accepted),
+                "n_rejected": sum(1 for r in ctx.reviewed if not r.accepted),
+                "injection_flags": len(ctx.injection_flags),
+            })
         return {}
 
     def n_checklist(state: ReviewState) -> ReviewState:
-        accepted = [r for r in ctx.reviewed if r.accepted]
-        items = run_checklist(accepted)
-        log.append("checklist", "evaluated",
-                   {"failures": [c.clause_type for c in items if not c.passed]})
-        ctx.memo = RiskMemo(
-            doc_id=state["doc_id"],
-            source_name=state["source_name"],
-            perspective=Perspective(state.get("perspective", "neutral")),
-            findings=ctx.reviewed,
-            checklist=items,
-            injection_flags=ctx.injection_flags,
-            hitl_status="pending",
-        )
+        with ctx.trace_run.span("checklist") as sp:
+            accepted = [r for r in ctx.reviewed if r.accepted]
+            items = run_checklist(accepted)
+            detail = {"failures": [c.clause_type for c in items if not c.passed]}
+            sp.update(metadata=detail)
+            log.append("checklist", "evaluated", detail)
+            ctx.memo = RiskMemo(
+                doc_id=state["doc_id"],
+                source_name=state["source_name"],
+                perspective=Perspective(state.get("perspective", "neutral")),
+                findings=ctx.reviewed,
+                checklist=items,
+                injection_flags=ctx.injection_flags,
+                hitl_status="pending",
+            )
         return {}
 
     def n_hitl(state: ReviewState) -> ReviewState:
+        # interrupt() pauses the run here; on resume the node re-executes from the
+        # top and interrupt() returns the decision. So the span + trace end live
+        # AFTER the interrupt — they only run on the resume pass (no double span).
         decision = interrupt(
             {"action": "approve_or_escalate", "summary": ctx.memo.summary()}
         )
         status = decision if isinstance(decision, str) else decision.get("decision", "approved")
-        log.append("hitl", "decision", {"status": status})
+        # On a cold resume-after-restart the earlier nodes didn't run in this
+        # process, so trace_run is unset — start a fresh short trace for the
+        # decision rather than crashing (tracing is best-effort, never load-bearing).
+        run = ctx.trace_run or tracer.start_run("contract_review_resume")
+        with run.span("hitl") as sp:
+            sp.update(metadata={"status": status})
+            log.append("hitl", "decision", {"status": status})
         ctx.memo = ctx.memo.model_copy(update={"hitl_status": status})
+        run.end(output=ctx.memo.summary())
         return {"hitl_status": status}
 
     g = StateGraph(ReviewState)
@@ -134,7 +168,7 @@ def build_graph(audit: AuditLog | None = None):
     g.add_edge("checklist", "hitl")
     g.add_edge("hitl", END)
 
-    return g.compile(checkpointer=MemorySaver()), log, ctx
+    return g.compile(checkpointer=get_checkpointer()), log, ctx
 
 
 __all__ = ["build_graph", "ReviewState", "RunContext", "V1_CLAUSES"]

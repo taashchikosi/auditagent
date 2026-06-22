@@ -1,0 +1,47 @@
+{
+  "model": "deepseek-v4-flash",
+  "runs": 3,
+  "n": 102,
+  "cost_latency": {
+    "usd_per_contract": 0.0032,
+    "latency_s_mean": 3.9
+  },
+  "metrics": {
+    "B2 high-risk recall": {
+      "mean": 0.7949,
+      "min": 0.7692,
+      "max": 0.8132,
+      "spread": 0.044
+    },
+    "B2 macro-F1": {
+      "mean": 0.6735,
+      "min": 0.6648,
+      "max": 0.6779,
+      "spread": 0.0131
+    },
+    "B2 citation faithfulness": {
+      "mean": 0.9198,
+      "min": 0.8726,
+      "max": 0.9442,
+      "spread": 0.0716
+    },
+    "B1 citation faithfulness (fair)": {
+      "mean": 0.8465,
+      "min": 0.8062,
+      "max": 0.8931,
+      "spread": 0.0869
+    },
+    "B1 citation faithfulness (naive)": {
+      "mean": 0.5655,
+      "min": 0.4997,
+      "max": 0.6969,
+      "spread": 0.1972
+    },
+    "B1 high-risk recall": {
+      "mean": 0.8279,
+      "min": 0.8132,
+      "max": 0.8352,
+      "spread": 0.022
+    }
+  }
+}

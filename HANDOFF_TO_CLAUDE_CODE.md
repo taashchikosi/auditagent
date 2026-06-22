@@ -7,9 +7,15 @@ _Last updated: 13 June 2026. Prior context: `HANDOFF_AuditAgent_GateFix_COMPLETE
 
 ## 0. TL;DR
 
-AuditAgent (citation-anchored CUAD contract-review agent) is **M1–M3 complete with a real, reproducible n=102 benchmark**. A deployment-readiness audit (13 Jun) cleared the three red blockers — **it is now demo-deployable**. What remains is **M4: get it live on the shared host with durable state.** All work is local; **73 tests pass**. Your job is M4, in the priority order in §5.
+AuditAgent (citation-anchored CUAD contract-review agent) is **M1–M3 complete with a real, reproducible n=102 benchmark**. A deployment-readiness audit (13 Jun) cleared the three deploy blockers and the codebase is clean (73 tests, ruff green). **It is NOT "done" — M4 is real production hardening** (durable state, real injection defense, observability, integration tests, UI), all required (§5). Your job is to take it to production-grade, in the order in §5, clearing the Definition of Done in §5.9.
 
 **FIRST ACTION:** all work is committed locally (latest `99290aa` on branch **`master`**) but **not yet pushed**, and the branch name **mismatches CI**. See §3 — it's a 2-command fix, and until it's pushed to the remote Taash created, the code exists nowhere but her disk and CI has never run.
+
+---
+
+## 0.1 ⛔ HARD RULE (overrides everything below)
+
+**Never compromise quality or thoroughness to rush to deployment. No skipped corners, no shortcuts. Aim for production-grade.** This rule overrides any line in this or any other project doc that says or implies "good enough for the demo," "optional," "ship the MVP," or "do it later." If you find such framing, treat the item as required work. "Demo-deployable" ≠ "done"; the bar is §5.9. (The one allowed exception is a gap Taash **explicitly** de-scopes in writing — and even then, flag it, don't assume it.)
 
 ---
 
@@ -81,35 +87,58 @@ git push -u origin main
 
 ---
 
-## 5. M4 — remaining work, in priority order
+## 5. M4 — remaining work (ALL items required for "done")
 
-### 5.1 🔴 Push + green CI (≈10 min) — do this first (it's §3)
-Acceptance: remote has the code on `main`, CI passes. ruff is already clean, so adding `ruff check src tests` as a CI step is now a safe, free quality gate — recommended.
+> **Per the project HARD RULE (§0.1): every item below is REQUIRED for production-grade.**
+> None are "optional" or "demo-only". Do them in this order (dependencies first); do not stop early or skip a step because the demo "looks fine." The Definition of Done in §5.9 is the bar — clear all of it.
 
-### 5.2 🔴 Deploy the container to the shared VPS (port 8002)
-- Build from the pinned Dockerfile; run beside RetrofitGPT (8001).
-- Wire `/health` to the unified site's 🟢/🔴 status dot.
-- Set `AUDITAGENT_API_TOKEN` + `DEEPSEEK_API_KEY` in the host env (NOT in the image).
-- Acceptance: `GET /health` returns 200 with `"citation_anchoring":"ok"`; a paid route returns 401 without the token and 200 with it; rate-limit returns 429 past the cap.
+### 5.1 🔴 Push + green CI — do first (it's §3)
+- Push to `main`; CI green. **Add `ruff check src tests` AND a coverage gate to CI** (ruff is already clean). CI must fail the build on lint error or a dropped test.
+- Acceptance: remote on `main`; CI runs `pytest` + `ruff` + deterministic eval and is green.
 
-### 5.3 🟡 Durable state (the real production gap)
-Currently everything is in-process and lost on restart:
-- **LangGraph checkpointer** is `MemorySaver` (`graph.py:137`) → swap to `langgraph.checkpoint.postgres.PostgresSaver` so a paused HITL run survives a restart/redeploy.
-- **`_SESSIONS` dict** (`app.py:73`) → back with the shared Postgres (keyed by a real session id, not `id(session)`).
-- **Audit log** is SQLite/`:memory:` (`audit_log.py:46`) → point `db_path` at the shared Postgres. The hash-chain logic is storage-agnostic; only the connection changes (note: sqlite3 → psycopg means the INSERT/SELECT SQL needs a parametrise-style check, it's not literally zero-change).
-- Acceptance: kill the container mid-HITL, restart, resume the decision successfully; `verify_chain()` still true across a restart.
+### 5.2 🔴 Real-model integration tests (don't rely only on the offline stub)
+- The 73 tests use the deterministic provider. Add a **keyed integration test** (marked `@pytest.mark.integration`, skipped without a key) that runs `/review` against real DeepSeek and asserts: every accepted finding's citation re-slices the contract exactly (M1 invariant holds end-to-end on the real model), and an injected contract is flagged.
+- Acceptance: `pytest -m integration` passes with `DEEPSEEK_API_KEY` set; the offline suite stays green and fast without a key.
 
-### 5.4 🟡 Langfuse tracing
-- Wrap the LangGraph nodes / LLM calls with Langfuse so each run is a trace (the observability story in ARCHITECTURE.md). Shared Langfuse instance per `portfolio-one-website` decision.
-- Acceptance: a `/review` call produces a visible trace with per-node spans + token usage.
+### 5.3 🔴 Durable state (the core production gap — NOT deferrable)
+Everything is in-process today and lost on restart. All three must move to the shared Postgres:
+- **LangGraph checkpointer** `MemorySaver` (`graph.py:137`) → `PostgresSaver` so a paused HITL run survives restart/redeploy.
+- **`_SESSIONS` dict** (`app.py`) → shared Postgres, keyed by the real session id.
+- **Audit log** SQLite/`:memory:` (`audit_log.py:46`) → shared Postgres. The hash-chain is storage-agnostic, but sqlite3 → psycopg needs a real parametrised-SQL pass + a migration; **re-run `verify_chain()` against Postgres, don't assume.**
+- Acceptance: kill the container mid-HITL, restart, resume the decision successfully; `verify_chain()` true across a restart; concurrent reviews don't collide.
 
-### 5.5 🟢 Next.js UI route in the unified site
-- Click-to-source provenance: the UI calls `get_span_text` (already an MCP tool) to highlight the exact cited span.
-- Acceptance: the demo contract reviews end-to-end in the browser with citations that highlight source text.
+### 5.4 🔴 Production-grade prompt-injection defense (regex is not enough)
+- `injection.py` is regex-only — bypassable by obfuscation/unicode/paraphrase. For an assurance product this must be real: add structural defenses (delimiter/quote-only extraction, an injection-classification check, and a test that the agent never downgrades risk on an adversarial set) and **measure a pass-rate over an adversarial corpus**, reported like the CUAD metrics.
+- Acceptance: documented adversarial set with a measured refusal rate; obfuscated-injection cases the old regex missed are caught.
 
-### 5.6 🟢 Optional polish
-- Harden injection beyond regex if time (it's defense-in-depth today).
-- (Already done in the 13 Jun quality pass: ruff is clean, version bumped to 0.3.0, Makefile/health/docstrings de-staled, proxy-aware rate-limit, uuid session ids, 404 on unknown session.)
+### 5.5 🔴 Observability — Langfuse tracing + structured logging
+- Wrap LangGraph nodes / LLM calls with Langfuse (shared instance per `portfolio-one-website`); add structured request logging + error capture on the API.
+- Acceptance: a `/review` call produces a trace with per-node spans + token usage; errors are logged with context, never swallowed.
+
+### 5.6 🔴 Resilience + load/security verification
+- Verify graceful behaviour under failure: provider timeout/5xx (retry path already exists — test it), malformed/oversized contract input (add request-size limits), and the rate-limit/token gate under concurrent load.
+- Acceptance: a documented load/abuse test showing 429s engage, the token gate holds, and a provider outage degrades gracefully (clear error, no crash, audit log intact).
+
+### 5.7 🔴 Next.js UI route in the unified site
+- Click-to-source provenance: the UI calls `get_span_text` (already an MCP tool) to highlight the exact cited span. Include the B1-vs-agent "catch" view and the injection-refusal demo.
+- Acceptance: the demo contract reviews end-to-end in the browser with citations that highlight source text; loading/error states handled.
+
+### 5.8 🟡 Full-corpus benchmark + cross-model confirmation
+- Re-run the n=102 eval after the 5.4 injection/prompt changes (prompts changed → numbers can move). Confirm the anchorer lift and uncapped precision hold; keep `eval_deepseek_full.{json,md}` canonical and reproducible.
+- Acceptance: committed, reproducible (2×, temp 0) numbers that match the README claims after all prompt changes.
+
+### 5.9 ✅ Definition of Done (the production-grade bar — all must be true)
+1. On `main`, CI green (pytest + ruff + coverage threshold + deterministic eval).
+2. Real-model integration test passing; M1 invariant verified end-to-end on the live model.
+3. State durable across restart (sessions, HITL checkpoint, audit log on Postgres; `verify_chain()` holds).
+4. Injection defense measured on an adversarial set, not regex-only.
+5. Langfuse traces + structured logging + graceful failure on provider/`input` errors.
+6. Load/abuse test documented; token gate + rate limit verified under concurrency.
+7. UI live on the unified site with click-to-source; `/health` drives the status dot.
+8. README/ARCHITECTURE/case-study numbers match the committed reproducible eval.
+9. No stubs, no TODOs, no swallowed exceptions in shipped paths; secrets only in env.
+
+_(Already complete from the 13 Jun quality pass: ruff clean, version 0.3.0, de-staled docs, proxy-aware rate-limit, uuid session ids, 404 on unknown session.)_
 
 ---
 
@@ -135,13 +164,17 @@ Currently everything is in-process and lost on restart:
 
 ---
 
-## 7. Known limitations (honest — keep them honest)
+## 7. Known gaps — to CLOSE before "done" (not accepted limitations)
 
-- **Durability:** HITL/sessions/audit log are in-process/SQLite → lost on restart (fixed by 5.3). This is the main thing between "demo" and "production".
-- **Injection detection** (`injection.py`) is **regex-only** — defense-in-depth, bypassable by obfuscation. The primary integrity control is the citation gate, not this.
-- **MCP boundary:** ARCHITECTURE.md says agents reach the contract "only through MCP tools"; in practice the pipeline calls the same functions directly (the MCP server is a parallel, demonstrable surface). Don't oversell this in the demo.
-- **Rate-limit store** is in-process (per-container). Correct for the single always-on container; a multi-replica deploy needs Redis behind the same `security.py` interface. It IS proxy-aware (reads `X-Forwarded-For`).
-- **CI vs Docker deps:** CI installs `.[dev]` (latest, catches breakage early); Docker installs `requirements.lock` (pinned, reproducible). Intentional.
+Per the HARD RULE, these are not things to ship around — each maps to a required §5 task. Listed so nothing is forgotten.
+
+- **Durability:** HITL/sessions/audit log are in-process/SQLite → lost on restart. **Close in 5.3** (Postgres). This is the main thing between "demo" and "production" — so it is required, not deferred.
+- **Injection defense** (`injection.py`) is regex-only, bypassable. The citation gate is the primary integrity control, but for an assurance product the injection defense must be real and measured. **Close in 5.4.**
+- **Real-model coverage:** tests use the deterministic stub; the live model is only exercised manually. **Close in 5.2.**
+- **Observability:** no Langfuse/structured logging yet. **Close in 5.5.**
+- **MCP boundary:** ARCHITECTURE.md says agents reach the contract "only through MCP tools"; in practice the pipeline calls the same functions directly. Either route agent contract-access through the MCP tools (preferred, matches the doc) or correct the doc — **don't leave the claim and the code disagreeing.**
+- **Rate-limit store** is in-process (per-container), proxy-aware via `X-Forwarded-For`. Fine for one container; **if the deploy is multi-replica, move to Redis (5.6).**
+- **CI vs Docker deps:** CI installs `.[dev]` (latest, catches breakage early); Docker installs `requirements.lock` (pinned). Intentional — keep.
 
 ---
 

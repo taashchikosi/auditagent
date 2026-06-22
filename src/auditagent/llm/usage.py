@@ -10,10 +10,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Approximate USD per 1M tokens. Override before a run if prices have moved.
-# (DeepSeek is cheap on long contracts — the reason it's the primary model.)
+# Approximate USD per 1M tokens (cache-miss input). Override before a run if
+# prices have moved. (DeepSeek is cheap on long contracts — the reason it's the
+# primary model.) v4-pro is ~3x v4-flash, so the eval's cost-per-contract line
+# moves when you A/B pro — that trade-off is exactly what the number is for.
 PRICE_PER_MTOK = {
-    "deepseek-v4-flash": {"in": 0.27, "out": 1.10},
+    "deepseek-v4-flash": {"in": 0.14, "out": 0.28},
+    "deepseek-v4-pro": {"in": 0.435, "out": 0.87},
     "claude-sonnet-4-6": {"in": 3.00, "out": 15.00},
 }
 

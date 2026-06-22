@@ -34,6 +34,11 @@ class ReviewSession:
     def memo(self) -> RiskMemo:
         return self._ctx.memo
 
+    @property
+    def thread_id(self) -> str:
+        """The LangGraph checkpoint thread id — the durable key for resume."""
+        return self._config["configurable"]["thread_id"]
+
     def decide(self, decision: str) -> RiskMemo:
         """Resume the graph past the HITL interrupt. decision ∈ approved|escalated."""
         self._graph.invoke(Command(resume=decision), self._config)

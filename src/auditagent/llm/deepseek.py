@@ -23,6 +23,18 @@ from .base import ClauseHit
 
 _ENDPOINT = "https://api.deepseek.com/chat/completions"
 
+# The API model id. Default is the current production model; override per run
+# with AUDITAGENT_DEEPSEEK_MODEL (e.g. "deepseek-v4-pro" to A/B the larger model
+# on the eval). NOTE: the old "deepseek-chat"/"deepseek-reasoner" aliases are
+# deprecated by DeepSeek (they error after 2026-07-24), so we default to the
+# explicit v4 id, and `.name` follows the real model so the eval report + cost
+# table never mislabel which model produced a number.
+_DEFAULT_MODEL = "deepseek-v4-flash"
+
+
+def _resolve_model(explicit: str | None) -> str:
+    return explicit or os.environ.get("AUDITAGENT_DEEPSEEK_MODEL", _DEFAULT_MODEL)
+
 _CLASSIFY_SYSTEM = (
     "You are a contract-clause detector. For each clause type the user lists, "
     "decide if the contract contains it. RECALL MATTERS MORE THAN PRECISION: a "
@@ -84,13 +96,58 @@ def _call_deepseek(
     from .usage import USAGE  # record measured tokens for cost reporting
 
     USAGE.add(usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
-    content = body["choices"][0]["message"]["content"]
+    # `.get` not `[]`: a reasoning model (e.g. deepseek-v4-pro) can return a null
+    # / empty `content` (its text lands in `reasoning_content`), which used to
+    # crash json.loads and ABORT the whole eval mid-run. Tolerant parsing makes
+    # one bad reply an honest "0 hits for this contract" instead.
+    content = body["choices"][0]["message"].get("content") or ""
     valid_keys = {c.key for c in clause_specs}
-    hits: list[ClauseHit] = []
-    for raw in json.loads(content).get("hits", []):
-        if raw.get("clause_key") in valid_keys and raw.get("quote"):
-            hits.append(ClauseHit(**raw))
-    return hits
+    return _parse_deepseek_hits(content, valid_keys)
+
+
+def _parse_deepseek_hits(content: str, valid_keys: set[str]) -> list[ClauseHit]:
+    """Strict JSON → salvage complete {..} objects → []. Never raises.
+
+    Mirrors the Claude adapter's resilience so a single empty or truncated reply
+    (reasoning model with no JSON, rate-limit-garbled body, max_tokens cutoff)
+    yields 'no hits for this contract' rather than killing a 102-contract run.
+    Empty / unparseable replies print a stderr warning so a SYSTEMIC failure
+    (e.g. a model that returns empty every time) is loud, not silently scored 0.
+    """
+    import re
+    import sys
+
+    def _collect(raws: list) -> list[ClauseHit]:
+        out: list[ClauseHit] = []
+        for raw in raws:
+            if isinstance(raw, dict) and raw.get("clause_key") in valid_keys and raw.get("quote"):
+                try:
+                    out.append(ClauseHit(**raw))
+                except Exception:
+                    continue
+        return out
+
+    text = content.strip()
+    if not text:
+        print("⚠️  deepseek: empty model reply — 0 hits for this contract", file=sys.stderr)
+        return []
+    # Strict path: isolate the outermost JSON object and parse it.
+    start, end = text.find("{"), text.rfind("}")
+    payload = text[start : end + 1] if start != -1 and end != -1 else text
+    try:
+        return _collect(json.loads(payload).get("hits", []))
+    except json.JSONDecodeError:
+        pass
+    # Salvage path: parse each self-contained hit object individually.
+    salvaged: list[dict] = []
+    for m in re.finditer(r"\{[^{}]*\}", text):
+        try:
+            salvaged.append(json.loads(m.group(0)))
+        except json.JSONDecodeError:
+            continue
+    if not salvaged:
+        print("⚠️  deepseek: unparseable model reply — 0 hits for this contract", file=sys.stderr)
+    return _collect(salvaged)
 
 
 def _clause_menu(clause_specs: tuple[ClauseSpec, ...]) -> str:
@@ -107,10 +164,9 @@ def _clause_menu(clause_specs: tuple[ClauseSpec, ...]) -> str:
 class DeepSeekProvider:
     """Primary clause DETECTOR (also the B1 single-shot baseline)."""
 
-    name = "deepseek-v4-flash"
-
-    def __init__(self, model: str = "deepseek-chat") -> None:
-        self.model = model
+    def __init__(self, model: str | None = None) -> None:
+        self.model = _resolve_model(model)
+        self.name = self.model  # honest: the label IS the model that ran
         self.api_key = os.environ["DEEPSEEK_API_KEY"]
 
     def classify(
@@ -132,10 +188,9 @@ class DeepSeekReviewer:
     model end-to-end instead of a DeepSeek detector with a Claude gate.
     """
 
-    name = "deepseek-v4-flash"
-
-    def __init__(self, model: str = "deepseek-chat") -> None:
-        self.model = model
+    def __init__(self, model: str | None = None) -> None:
+        self.model = _resolve_model(model)
+        self.name = self.model
         self.api_key = os.environ["DEEPSEEK_API_KEY"]
 
     def classify(

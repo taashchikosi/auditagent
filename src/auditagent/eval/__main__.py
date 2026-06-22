@@ -36,12 +36,16 @@ def main() -> int:
         if args.full
         else load_cuad_sample(limit=args.limit)
     )
+    # Keep the cost-label model in lock-step with the API model the DeepSeek
+    # adapter will actually call (AUDITAGENT_DEEPSEEK_MODEL), so the report's
+    # `model` field and cost-per-contract never mislabel a v4-pro run as flash.
+    ds_model = os.environ.get("AUDITAGENT_DEEPSEEK_MODEL", "deepseek-v4-flash")
     if os.environ.get("DEEPSEEK_API_KEY"):
-        provider, model = "DeepSeek (real)", "deepseek-v4-flash"
+        provider, model = "DeepSeek (real)", ds_model
     elif os.environ.get("ANTHROPIC_API_KEY"):
         provider, model = "Claude (real)", "claude-sonnet-4-6"
     else:
-        provider, model = "deterministic (offline)", "deepseek-v4-flash"
+        provider, model = "deterministic (offline)", ds_model
     model = args.model or model
     print(f"Scoring {len(contracts)} CUAD contracts · provider: {provider}")
 

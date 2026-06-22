@@ -40,25 +40,40 @@ def test_paid_route_open_when_no_token_configured():
     assert "memo" in r.json()
 
 
-def test_paid_route_rejects_without_token_when_configured(monkeypatch):
+_ADHOC = {"raw_text": "8.1 transfers to the successor entity.", "perspective": "buyer"}
+
+
+def test_open_ended_review_rejects_without_token_when_configured(monkeypatch):
+    # The arbitrary-text /review route IS the bill-abuse vector → token-gated.
     monkeypatch.setenv("AUDITAGENT_API_TOKEN", "s3cret-token")
-    r = client.post("/review/sample?perspective=buyer")
+    assert client.post("/review", json=_ADHOC).status_code == 401
+
+
+def test_open_ended_review_rejects_wrong_token(monkeypatch):
+    monkeypatch.setenv("AUDITAGENT_API_TOKEN", "s3cret-token")
+    r = client.post("/review", headers={"Authorization": "Bearer wrong"}, json=_ADHOC)
     assert r.status_code == 401
 
 
-def test_paid_route_rejects_wrong_token(monkeypatch):
-    monkeypatch.setenv("AUDITAGENT_API_TOKEN", "s3cret-token")
-    r = client.post("/review/sample", headers={"Authorization": "Bearer wrong"})
-    assert r.status_code == 401
-
-
-def test_paid_route_accepts_correct_token(monkeypatch):
+def test_open_ended_review_accepts_correct_token(monkeypatch):
     monkeypatch.setenv("AUDITAGENT_API_TOKEN", "s3cret-token")
     r = client.post(
-        "/review/sample?perspective=buyer",
-        headers={"Authorization": "Bearer s3cret-token"},
+        "/review", headers={"Authorization": "Bearer s3cret-token"}, json=_ADHOC
     )
     assert r.status_code == 200
+
+
+def test_demo_routes_stay_open_even_with_token_configured(monkeypatch):
+    """Setting the token to protect /review must NOT lock the public browser demo.
+
+    The pre-loaded, fixed-input demo routes are rate-limited only, so the
+    portfolio site keeps working without shipping a secret to the browser.
+    """
+    monkeypatch.setenv("AUDITAGENT_API_TOKEN", "s3cret-token")
+    assert client.post("/review/sample?perspective=buyer").status_code == 200
+    assert client.post("/review/stream?perspective=buyer").status_code == 200
+    assert client.get("/compare/sample?perspective=buyer").status_code == 200
+    assert client.get("/compare/injection?perspective=buyer").status_code == 200
 
 
 def test_health_stays_open_even_with_token_configured(monkeypatch):

@@ -1,0 +1,151 @@
+{
+  "n_contracts": 102,
+  "model": "deepseek-v4-flash",
+  "provider": "DeepSeek (real)",
+  "numbers_are_real_model": true,
+  "B0": {
+    "name": "RoBERTa-large (CUAD paper, NeurIPS 2021)",
+    "p_at_80r": 0.482,
+    "note": "fine-tuned encoder baseline; we beat or contextualise this bar"
+  },
+  "B1": {
+    "n_contracts": 102,
+    "macro_f1": 0.6906,
+    "high_risk_recall": 0.8352,
+    "mean_laziness_rate": 0.2329,
+    "mean_citation_faithfulness": 0.8931,
+    "per_clause": {
+      "change_of_control": {
+        "precision": 0.641,
+        "recall": 0.9615,
+        "f1": 0.7692,
+        "laziness_rate": 0.0385,
+        "citation_faithfulness": 0.8,
+        "p_at_80r": 0.641,
+        "aupr": 0.5722,
+        "support": 26
+      },
+      "uncapped_liability": {
+        "precision": 0.0323,
+        "recall": 0.0769,
+        "f1": 0.0455,
+        "laziness_rate": 0.9231,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.1275,
+        "aupr": 0.0975,
+        "support": 13
+      },
+      "auto_renewal": {
+        "precision": 0.9333,
+        "recall": 0.875,
+        "f1": 0.9032,
+        "laziness_rate": 0.125,
+        "citation_faithfulness": 0.9286,
+        "p_at_80r": 1.0,
+        "aupr": 0.9001,
+        "support": 16
+      },
+      "non_compete": {
+        "precision": 0.7586,
+        "recall": 0.9565,
+        "f1": 0.8462,
+        "laziness_rate": 0.0435,
+        "citation_faithfulness": 0.7727,
+        "p_at_80r": 0.7857,
+        "aupr": 0.9102,
+        "support": 23
+      },
+      "termination_for_convenience": {
+        "precision": 0.8235,
+        "recall": 0.9655,
+        "f1": 0.8889,
+        "laziness_rate": 0.0345,
+        "citation_faithfulness": 0.9643,
+        "p_at_80r": 0.9259,
+        "aupr": 0.9126,
+        "support": 29
+      }
+    },
+    "sec_per_contract": 10.677,
+    "cost_usd_total": 0.1734,
+    "cost_usd_per_contract": 0.0017,
+    "tokens": 1137322
+  },
+  "B2": {
+    "n_contracts": 102,
+    "macro_f1": 0.6778,
+    "high_risk_recall": 0.7692,
+    "mean_laziness_rate": 0.2603,
+    "mean_citation_faithfulness": 0.9442,
+    "per_clause": {
+      "change_of_control": {
+        "precision": 0.6216,
+        "recall": 0.8846,
+        "f1": 0.7302,
+        "laziness_rate": 0.1154,
+        "citation_faithfulness": 0.8261,
+        "p_at_80r": 0.6471,
+        "aupr": 0.5167,
+        "support": 26
+      },
+      "uncapped_liability": {
+        "precision": 0.0769,
+        "recall": 0.1538,
+        "f1": 0.1026,
+        "laziness_rate": 0.8462,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.1275,
+        "aupr": 0.1869,
+        "support": 13
+      },
+      "auto_renewal": {
+        "precision": 0.8824,
+        "recall": 0.9375,
+        "f1": 0.9091,
+        "laziness_rate": 0.0625,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.9286,
+        "aupr": 0.9278,
+        "support": 16
+      },
+      "non_compete": {
+        "precision": 0.7917,
+        "recall": 0.8261,
+        "f1": 0.8085,
+        "laziness_rate": 0.1739,
+        "citation_faithfulness": 0.8947,
+        "p_at_80r": 0.8261,
+        "aupr": 0.8517,
+        "support": 23
+      },
+      "termination_for_convenience": {
+        "precision": 0.7879,
+        "recall": 0.8966,
+        "f1": 0.8387,
+        "laziness_rate": 0.1034,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.8621,
+        "aupr": 0.7438,
+        "support": 29
+      }
+    },
+    "sec_per_contract": 8.894,
+    "cost_usd_total": 0.2006,
+    "cost_usd_per_contract": 0.00197,
+    "tokens": 1325472
+  },
+  "B2_detection": {
+    "high_risk_recall": 0.7912,
+    "macro_f1": 0.6818,
+    "mean_laziness_rate": 0.2429
+  },
+  "B1_naive": {
+    "high_risk_recall": 0.8352,
+    "macro_f1": 0.6906,
+    "mean_citation_faithfulness": 0.6969
+  },
+  "B2_wrong_location_findings": 6,
+  "delta_high_risk_recall_B2_minus_B1": -0.0659,
+  "delta_macro_f1_B2_minus_B1": -0.0128,
+  "gate_gap_high_risk_recall": 0.022
+}

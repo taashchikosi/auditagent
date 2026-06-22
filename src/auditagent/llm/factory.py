@@ -8,13 +8,46 @@ from .base import LLMProvider
 from .deterministic import DeterministicProvider
 
 
+def _override(var: str) -> str:
+    """Read an explicit model override (claude|deepseek|deterministic|'').
+
+    Lets you A/B Claude as the detector WITHOUT unsetting DEEPSEEK_API_KEY:
+        AUDITAGENT_CLASSIFIER=claude   # force the classify node onto Claude
+        AUDITAGENT_REVIEWER=deepseek   # keep the gate on DeepSeek
+    Empty/unset → fall back to the normal key-precedence below.
+    """
+    return os.environ.get(var, "").strip().lower()
+
+
+def _provider_named(which: str, role: str) -> LLMProvider | None:
+    """Build the explicitly-requested provider, or None if `which` is blank.
+
+    role ∈ {"classifier", "reviewer"} selects the right Claude/DeepSeek twin.
+    """
+    if which in {"claude", "anthropic"}:
+        from .claude import ClaudeClassifier, ClaudeReviewer
+
+        return ClaudeReviewer() if role == "reviewer" else ClaudeClassifier()
+    if which in {"deepseek", "ds"}:
+        from .deepseek import DeepSeekProvider, DeepSeekReviewer
+
+        return DeepSeekReviewer() if role == "reviewer" else DeepSeekProvider()
+    if which in {"deterministic", "offline", "fake"}:
+        return DeterministicProvider(lazy=False)
+    return None
+
+
 def get_classifier() -> LLMProvider:
     """Primary clause classifier.
 
-    Precedence: DeepSeek (locked production model) → Claude (real-model
-    benchmark / fallback) → deterministic (CI-safe). DeepSeek first means the
-    deploy-time swap back to DeepSeek is a no-op — just set its key.
+    Explicit override (AUDITAGENT_CLASSIFIER) wins; otherwise precedence is
+    DeepSeek (locked production model) → Claude (real-model benchmark /
+    fallback) → deterministic (CI-safe). DeepSeek first means the deploy-time
+    swap back to DeepSeek is a no-op — just set its key.
     """
+    forced = _provider_named(_override("AUDITAGENT_CLASSIFIER"), "classifier")
+    if forced is not None:
+        return forced
     if os.environ.get("DEEPSEEK_API_KEY"):
         from .deepseek import DeepSeekProvider
 
@@ -29,10 +62,14 @@ def get_classifier() -> LLMProvider:
 def get_reviewer() -> LLMProvider:
     """Citation-gate re-extractor.
 
-    Precedence MIRRORS the classifier: DeepSeek → Claude → deterministic, so a
-    DeepSeek run gets a DeepSeek gate (one model end-to-end — an honest, clean
-    benchmark) rather than a DeepSeek detector wearing a Claude gate.
+    Explicit override (AUDITAGENT_REVIEWER) wins; otherwise precedence MIRRORS
+    the classifier: DeepSeek → Claude → deterministic, so a DeepSeek run gets a
+    DeepSeek gate (one model end-to-end — an honest, clean benchmark) rather
+    than a DeepSeek detector wearing a Claude gate.
     """
+    forced = _provider_named(_override("AUDITAGENT_REVIEWER"), "reviewer")
+    if forced is not None:
+        return forced
     if os.environ.get("DEEPSEEK_API_KEY"):
         from .deepseek import DeepSeekReviewer
 

@@ -171,6 +171,12 @@ class ReviewStatus(str, Enum):
     REJECTED_UNCITED = "rejected_uncited"
     REJECTED_BAD_CITATION = "rejected_bad_citation"
     REJECTED_INJECTION = "rejected_injection"
+    # Citation is faithful (the quote IS in the document) but the quoted text
+    # does not satisfy the clause definition — a faithful-but-wrong flag (e.g.
+    # a liability *limitation* filed as "uncapped"). Caught by the deterministic
+    # definitional gate. Distinct from a bad citation: the evidence is real, the
+    # *label* is wrong.
+    REJECTED_DEFINITION = "rejected_definition"
 
 
 class Finding(BaseModel):
@@ -196,6 +202,24 @@ class Finding(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
+class ReviewAttempt(BaseModel):
+    """One step of the citation gate's verify → reflect → retry loop.
+
+    Purely observational: the gate records *why* it accepted, retried, or
+    rejected each finding so the decision trail is inspectable (and the demo
+    can show the loop running). Recording attempts does NOT change any
+    accept/reject outcome — the verification logic is unchanged.
+    """
+
+    n: int = Field(..., ge=0, description="0 = first verify, 1 = first retry, …")
+    action: str = Field(..., description="verify | reflect | re_extract | reject")
+    outcome: str = Field(
+        ...,
+        description="verified | no_citation | anchor_failed | re_extracted | rejected",
+    )
+    detail: str = ""
+
+
 class ReviewedFinding(BaseModel):
     """A finding after the citation gate has ruled on it."""
 
@@ -203,6 +227,10 @@ class ReviewedFinding(BaseModel):
     status: ReviewStatus
     reason: str = ""
     retries: int = 0
+    attempts: list[ReviewAttempt] = Field(
+        default_factory=list,
+        description="The verify-retry loop trace (observability; not scored).",
+    )
 
     @property
     def accepted(self) -> bool:

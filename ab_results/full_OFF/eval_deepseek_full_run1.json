@@ -1,0 +1,151 @@
+{
+  "n_contracts": 102,
+  "model": "deepseek-v4-flash",
+  "provider": "DeepSeek (real)",
+  "numbers_are_real_model": true,
+  "B0": {
+    "name": "RoBERTa-large (CUAD paper, NeurIPS 2021)",
+    "p_at_80r": 0.482,
+    "note": "fine-tuned encoder baseline; we beat or contextualise this bar"
+  },
+  "B1": {
+    "n_contracts": 102,
+    "macro_f1": 0.6267,
+    "high_risk_recall": 0.8901,
+    "mean_laziness_rate": 0.1081,
+    "mean_citation_faithfulness": 0.805,
+    "per_clause": {
+      "change_of_control": {
+        "precision": 0.4138,
+        "recall": 0.9231,
+        "f1": 0.5714,
+        "laziness_rate": 0.0769,
+        "citation_faithfulness": 0.625,
+        "p_at_80r": 0.6053,
+        "aupr": 0.5823,
+        "support": 26
+      },
+      "uncapped_liability": {
+        "precision": 0.3103,
+        "recall": 0.6923,
+        "f1": 0.4286,
+        "laziness_rate": 0.3077,
+        "citation_faithfulness": 0.7778,
+        "p_at_80r": 0.1275,
+        "aupr": 0.1522,
+        "support": 13
+      },
+      "auto_renewal": {
+        "precision": 0.4444,
+        "recall": 1.0,
+        "f1": 0.6154,
+        "laziness_rate": 0.0,
+        "citation_faithfulness": 0.8125,
+        "p_at_80r": 0.9333,
+        "aupr": 0.9297,
+        "support": 16
+      },
+      "non_compete": {
+        "precision": 0.6,
+        "recall": 0.913,
+        "f1": 0.7241,
+        "laziness_rate": 0.087,
+        "citation_faithfulness": 0.8095,
+        "p_at_80r": 0.8261,
+        "aupr": 0.8703,
+        "support": 23
+      },
+      "termination_for_convenience": {
+        "precision": 0.6923,
+        "recall": 0.931,
+        "f1": 0.7941,
+        "laziness_rate": 0.069,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.9231,
+        "aupr": 0.882,
+        "support": 29
+      }
+    },
+    "sec_per_contract": 3.401,
+    "cost_usd_total": 0.3188,
+    "cost_usd_per_contract": 0.00313,
+    "tokens": 1071819
+  },
+  "B2": {
+    "n_contracts": 102,
+    "macro_f1": 0.6491,
+    "high_risk_recall": 0.9121,
+    "mean_laziness_rate": 0.0965,
+    "mean_citation_faithfulness": 0.8485,
+    "per_clause": {
+      "change_of_control": {
+        "precision": 0.4211,
+        "recall": 0.9231,
+        "f1": 0.5783,
+        "laziness_rate": 0.0769,
+        "citation_faithfulness": 0.6667,
+        "p_at_80r": 0.6216,
+        "aupr": 0.5299,
+        "support": 26
+      },
+      "uncapped_liability": {
+        "precision": 0.3846,
+        "recall": 0.7692,
+        "f1": 0.5128,
+        "laziness_rate": 0.2308,
+        "citation_faithfulness": 0.8,
+        "p_at_80r": 0.1275,
+        "aupr": 0.1407,
+        "support": 13
+      },
+      "auto_renewal": {
+        "precision": 0.4412,
+        "recall": 0.9375,
+        "f1": 0.6,
+        "laziness_rate": 0.0625,
+        "citation_faithfulness": 0.8667,
+        "p_at_80r": 0.8824,
+        "aupr": 0.9122,
+        "support": 16
+      },
+      "non_compete": {
+        "precision": 0.6471,
+        "recall": 0.9565,
+        "f1": 0.7719,
+        "laziness_rate": 0.0435,
+        "citation_faithfulness": 0.9091,
+        "p_at_80r": 0.8261,
+        "aupr": 0.871,
+        "support": 23
+      },
+      "termination_for_convenience": {
+        "precision": 0.675,
+        "recall": 0.931,
+        "f1": 0.7826,
+        "laziness_rate": 0.069,
+        "citation_faithfulness": 1.0,
+        "p_at_80r": 0.8276,
+        "aupr": 0.7837,
+        "support": 29
+      }
+    },
+    "sec_per_contract": 3.372,
+    "cost_usd_total": 0.3568,
+    "cost_usd_per_contract": 0.0035,
+    "tokens": 1209116
+  },
+  "B2_detection": {
+    "high_risk_recall": 0.9121,
+    "macro_f1": 0.6417,
+    "mean_laziness_rate": 0.0965
+  },
+  "B1_naive": {
+    "high_risk_recall": 0.8901,
+    "macro_f1": 0.6267,
+    "mean_citation_faithfulness": 0.5552
+  },
+  "B2_wrong_location_findings": 14,
+  "delta_high_risk_recall_B2_minus_B1": 0.022,
+  "delta_macro_f1_B2_minus_B1": 0.0224,
+  "gate_gap_high_risk_recall": 0.0
+}

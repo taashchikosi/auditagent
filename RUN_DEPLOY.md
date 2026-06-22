@@ -11,8 +11,12 @@ Recruiter → Vercel (Next.js)  ──HTTPS──►  Caddy (TLS) ──► dock
             /auditagent route             auditagent.<host>     (stateless, no DB)
 ```
 
-Unlike RetrofitGPT, AuditAgent has **no database, no EnergyPlus, no weather download** —
-sessions/audit-log are in-process for the demo (durable Postgres is a later milestone).
+Unlike RetrofitGPT, AuditAgent has no EnergyPlus and no weather download, so the container
+is light. **State today is in-process (sessions, HITL checkpoint, audit log) — this is a
+KNOWN GAP, not an accepted design choice.** Per the project hard rule (production-grade, no
+shortcuts), durable Postgres-backed state is **required for "done"**, not optional — see
+`HANDOFF_TO_CLAUDE_CODE.md` §5.3 / §5.9. This runbook stands up the current build so it is
+reachable; it does **not** mean the project is finished.
 
 ---
 

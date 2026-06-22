@@ -4,13 +4,15 @@
 
 > In 2025, Deloitte Australia partially refunded the federal government after an AI-assisted report contained fabricated citations. AuditAgent is built to make that failure impossible: **every finding must quote the exact contract text it came from, or it is rejected.**
 
-`Status: 🟢 Milestone 3 of 4 complete + real-model benchmark in. M4 (deploy) in progress. (M1: parsing · M2: pipeline + citation gate · M3: CUAD eval, n=102 reproducible.)`
+`Status: 🟢 M1–M3 complete & deployed live · 108 tests green · M4 production-hardening in progress (opt-in durable Postgres audit log + LangGraph checkpointer + HITL session store, Langfuse tracing). (M1: parsing · M2: pipeline + citation gate · M3: CUAD eval harness on the n=102 held-out test split.)`
+
+> ✅ **Headline re-baselined (22 Jun 2026).** The old `0.912` was built on a DeepSeek alias the provider silently re-pointed; re-running on a **pinned** `deepseek-v4-flash`, n=102 ×3, gives **macro-F1 0.674 (spread 0.013, reproducible)**. Agent high-risk recall **0.795 ± 0.044** is *below* single-shot's **0.828** — so the **citation gate is an integrity / faithfulness mechanism, not an accuracy booster, and the agent does not "beat single-shot."** Citation-faithfulness figures are too run-to-run noisy on this model to publish as point estimates (the naive→gate *lift* is large, ~+0.35 mean, reported directionally). Full numbers in the [results section](#real-model-result--re-baselined-deepseek-v4-flash-pinned-full-cuad-test-split-n102-temp-0-3-mean--spread) below.
 
 ---
 
 ## Why this project
 
-Contract review is the highest-volume agentic use case at the Big 4 (Deloitte Zora, KPMG Clara). Most portfolio demos can't put a *number* on accuracy. This one can — it's evaluated against [CUAD](https://www.atticusprojectai.org/cuad) (510 real contracts, 41 expert-defined clause types, 13,000+ lawyer labels, CC BY 4.0).
+Contract review is the highest-volume agentic use case at the Big 4 (Deloitte Zora, KPMG Clara). Most portfolio demos can't put a *number* on accuracy. This one can — it's evaluated on the held-out **test split (102 contracts)** of [CUAD](https://www.atticusprojectai.org/cuad) (a dataset of 510 real contracts, 41 expert-defined clause types, 13,000+ lawyer labels, CC BY 4.0). The 102-contract figure is the number scored; 510 is the full corpus size.
 
 Two un-fakeable proofs of depth:
 
@@ -31,12 +33,12 @@ The 2025 **ContractEval** benchmark ran 19 LLMs on CUAD and found they are *"laz
 
 ## What's built now (Milestone 2)
 
-The 4-agent pipeline is wired through **LangGraph**, and the **citation gate** is live — the core differentiator. Every accepted finding quotes an exact source span or it's rejected.
+Four stages are wired through **LangGraph** — and they are *deliberately* deterministic except where judgment is actually needed. Parsing, severity, and the mandatory-clause checklist are plain code (knowing when **not** to call an LLM is part of the design). The one genuinely agentic component is the **Reviewer**: an `act → verify → reflect → retry → decide` loop bounded by a retry budget, whose per-attempt trace is recorded and streamed. So this is a **deterministic workflow with one agentic verification loop**, not a chain of LLM calls relabelled "agents" — the distinction is Anthropic's own (*Building Effective Agents*). Every accepted finding quotes an exact source span or the loop rejects it.
 
 | Delivered (M2) | Where |
 |---|---|
-| LangGraph supervisor: Extractor → Classifier → Risk Analyzer → Reviewer | `src/auditagent/graph.py`, `agents/` |
-| **Citation gate** — uncited/mis-cited findings auto-rejected (1 retry, then reject) | `agents/reviewer.py` |
+| LangGraph pipeline: Extractor → Classifier → Risk Analyzer → Reviewer (streamed in real order via `/review/stream`) | `src/auditagent/graph.py`, `agents/`, `app.py` |
+| **Citation gate** — explicit verify→reflect→retry loop; uncited/mis-cited findings rejected (1 retry, then reject); per-attempt trace | `agents/reviewer.py` |
 | Deterministic checklist engine (pass/fail in code, not the LLM) | `checklist.py` |
 | Immutable, hash-chained audit log (tamper-evident) | `audit_log.py` |
 | Prompt-injection detector — agent refuses in-contract attacks (OWASP LLM01) | `injection.py` |
@@ -61,18 +63,25 @@ contract review: **laziness rate** (present clauses wrongly called absent),
 recall**. The baseline ladder is **B0** (published RoBERTa P@80%R ≈ 0.482) →
 **B1** single-shot → **B2** agent.
 
-### Real-model result — DeepSeek V4 Flash, full CUAD test split (n=102, temperature 0, 2× reproducibility-checked)
+### Real-model result — RE-BASELINED, DeepSeek **V4 Flash (pinned)**, full CUAD test split (n=102, temp 0, **3× mean ± spread**)
 
-| Metric | Value |
-|---|---|
-| B2 macro-F1 | **0.649** |
-| B2 high-risk recall | **0.912** |
-| Citation faithfulness — naive exact-anchor → **fuzzy-but-verified anchorer** | 0.555 → **0.849** (**+0.29**) |
-| Cost / latency per contract | **$0.0035 · 3.4 s** (measured from token usage) |
+The headline number was re-established the honest way after the old `deepseek-chat` figure stopped reproducing: one **pinned** model, **3 runs**, report the mean and the run-to-run spread, and publish a metric **only if its spread is tight** (≤0.03).
 
-**The headline is the citation anchorer** (+0.29 faithfulness, replicated on Claude at +0.33), not "agent beats single-shot." The gate is a **precision / integrity mechanism**: every accepted finding is a verified exact quote; an unanchorable (likely hallucinated) one cannot pass. See [`CASE_STUDY_n102_wobble.md`](CASE_STUDY_n102_wobble.md) for the full measure → scale → root-cause → fix arc (incl. the `uncapped_liability` precision fix, **0.20 → 0.39 with no recall loss**).
+| Metric | Mean (n=102, ×3) | Spread | Publishable? |
+|---|---|---|---|
+| **B2 macro-F1** | **0.674** | 0.013 | ✅ yes — reproducible |
+| B1 single-shot high-risk recall | **0.828** | 0.022 | ✅ yes |
+| B2 **agent** high-risk recall | **0.795** | 0.044 | ⚠️ drifty — quote only as ~0.79 ± 0.04 |
+| Citation faithfulness — naive→gate **lift** | **≈ +0.35 mean** | — | ⚠️ directional — components are noisy (below) |
+| Citation faithfulness (B2 gate / B1 fair / B1 naive) | 0.92 / 0.85 / 0.57 | 0.07 / 0.09 / 0.20 | 🚨 too noisy — do **not** publish as point estimates |
 
-> ✅ **Reproducible at temperature 0.** The committed `eval_deepseek_full.{json,md}` is the canonical run; `eval_report.{json,md}` is the offline deterministic floor that validates the measurement machinery in CI without a key. Cost+latency are **measured** from the API's token usage — never guessed.
+**The honest story (this is the asset, not a weakness):**
+- **The agent does NOT beat single-shot.** On this re-baseline, agent high-risk recall **0.795 < single-shot 0.828** — the gate is a **precision / integrity** mechanism (every accepted finding is a verified exact quote; an unanchorable one can't pass), *not* an accuracy booster. Saying otherwise would be false.
+- **The old `0.912` headline does not reproduce and is retired.** The current honest, reproducible number is **macro-F1 0.674** (spread 0.013).
+- The **citation anchorer lift is large** (naive→gate ≈ **+0.35 mean**), but the absolute faithfulness figures swing run-to-run on this model (spread up to 0.20), so the lift is reported **directionally**, never as a clean `+0.29`.
+- Cost / latency (measured from token usage): DeepSeek V4 Flash ~**$0.0032 · ~3.9 s** per contract.
+
+> Source: `rebaseline/REBASELINE_SUMMARY.{json,md}` (`bash scripts/rebaseline.sh`, 22 Jun 2026). `eval_report.{json,md}` remains the offline deterministic floor that validates the measurement machinery in CI without a key.
 
 ### The catch (run `make demo-m2`)
 
@@ -127,7 +136,7 @@ Five clauses with a real F1 table beats 41 half-working. Expanding to 41 is v1.1
 | **M1 ✅** | FastMCP runs; contract parses to offset-exact spans; `/health` up; contract pre-loaded |
 | **M2 ✅** | 4-agent LangGraph pipeline; **citation gate** rejects uncited findings; HITL approve gate; injection resistance; B1-vs-agent side-by-side |
 | **M3 ✅** | CUAD scorer + baseline ladder B0/B1/B2 + per-clause F1 + laziness/faithfulness + measured cost/latency, in CI. **Real DeepSeek numbers in at n=102, reproducible at temp 0.** |
-| **M4 🔨 (in progress)** | Live on the shared host as a route in the unified portfolio site. **Done:** Docker + pinned deps, `/health`, bearer-token + rate-limit on paid routes. **Remaining:** push to remote + CI run, Postgres-backed sessions/audit log, Langfuse traces. |
+| **M4 🔨 (in progress)** | Live on the shared host as a route in the unified portfolio site. **Done:** Docker + pinned deps, `/health`, bearer-token + rate-limit on paid routes; **opt-in Postgres backend** for the audit log + LangGraph checkpointer + HITL session store (`AUDITAGENT_DATABASE_URL`); **opt-in Langfuse tracing** (no-op when unset). **Remaining:** push to remote + CI run; re-baseline the headline number on a pinned model (Mac/live); real-model integration tests run on a keyed machine. |
 
 ---
 
@@ -149,6 +158,22 @@ export AUDITAGENT_RATE_WINDOW_SEC=60   # window length in seconds (default 60)
 ```
 
 The token gate fails **open** when no token is configured (zero-config local demo) and enforces the moment the env var is present. Rate-limit state is in-process — correct for the single always-on container; a multi-replica deploy moves the window to Redis behind the same dependency interface.
+
+## Configuration (env vars)
+
+All optional — the package runs zero-config with sensible defaults. Keys/URLs go in the **terminal env only**, never in chat or committed files.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `AUDITAGENT_API_TOKEN` | unset (open) | If set, `/review` + `/review/sample` + `/compare/*` require `Authorization: Bearer <token>`; `/health` stays open. |
+| `AUDITAGENT_RATE_LIMIT` / `AUDITAGENT_RATE_WINDOW_SEC` | `20` / `60` | Per-client request budget on the paid routes. |
+| `AUDITAGENT_ALLOWED_ORIGINS` | `*` | Comma-separated CORS origins (set to the Vercel domain in prod). |
+| `DEEPSEEK_API_KEY` / `ANTHROPIC_API_KEY` | unset | Enable the real models. With neither set, a deterministic offline stand-in runs (CI-safe, **never** a benchmark). |
+| `AUDITAGENT_CLASSIFIER` / `AUDITAGENT_REVIEWER` | provider precedence | Force the detector/gate model independently (e.g. `claude`) without unsetting keys — used to A/B model families. |
+| `AUDITAGENT_DEEPSEEK_MODEL` | `deepseek-v4-flash` | Pin the DeepSeek model id explicitly (the alias re-point is what broke the headline number — always pin for an eval). |
+| `AUDITAGENT_DEFINITION_GATE` | `0` (off) | Opt-in **definitional gate** — the citation gate's semantic second half. Only the for-cause/for-convenience **polarity rule** is active (it's a strict win: precision +0.039 *and* recall +0.017 on n=102). The keyword "require_any" rules were measured to **cost recall** and are intentionally disabled — see [`RUN_DEFINITION_GATE.md`](RUN_DEFINITION_GATE.md). |
+| `AUDITAGENT_DATABASE_URL` | unset (in-memory) | **M4, opt-in.** Postgres connection string. When set, the audit log, the LangGraph checkpointer, and the HITL session store persist to Postgres instead of in-memory; unset = the current in-memory behaviour (what the test suite runs on). |
+| `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` | unset (no-op) | **M4, opt-in.** When all set, each review run + node emits a Langfuse trace/span; unset = a no-op shim with zero overhead and no dependency required. |
 
 ## References
 
